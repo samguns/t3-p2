@@ -54,8 +54,34 @@ def layers(vgg_layer3_out, vgg_layer4_out, vgg_layer7_out, num_classes):
     :param num_classes: Number of classes to classify
     :return: The Tensor for the last layer of output
     """
-    # TODO: Implement function
-    return None
+    regularizer = tf.contrib.layers.l2_regularizer(1e-3)
+    initializer = tf.truncated_normal_initializer(stddev=0.01)
+    pool3_out_scaled = tf.multiply(vgg_layer3_out, 0.0001, name='pool3_out_scaled')
+    pool4_out_scaled = tf.multiply(vgg_layer4_out, 0.01, name='pool4_out_scaled')
+
+    score_fr = tf.layers.conv2d(vgg_layer7_out, num_classes, 1, padding='same',
+                                kernel_regularizer=regularizer, kernel_initializer=initializer)
+
+    upscore2 = tf.layers.conv2d_transpose(score_fr, num_classes, 4, strides=(2, 2), padding='same',
+                                          kernel_regularizer=regularizer,
+                                          kernel_initializer=initializer)
+    score_pool4 = tf.layers.conv2d(pool4_out_scaled, num_classes, 1, padding='same',
+                                   kernel_regularizer=regularizer,
+                                   kernel_initializer=initializer)
+    fuse_pool4 = tf.add(upscore2, score_pool4)
+
+    upscore_pool4 = tf.layers.conv2d_transpose(fuse_pool4, num_classes, 4, strides=(2, 2), padding='same',
+                                               kernel_regularizer=regularizer,
+                                               kernel_initializer=initializer)
+    score_pool3 = tf.layers.conv2d(pool3_out_scaled, num_classes, 1, padding='same',
+                                   kernel_regularizer=regularizer,
+                                   kernel_initializer=initializer)
+    fuse_pool3 = tf.add(upscore_pool4, score_pool3)
+
+    upscore8 = tf.layers.conv2d_transpose(fuse_pool3, num_classes, 16, strides=(8, 8), padding='same',
+                                          kernel_regularizer=regularizer,
+                                          kernel_initializer=initializer)
+    return upscore8
 tests.test_layers(layers)
 
 
@@ -68,9 +94,18 @@ def optimize(nn_last_layer, correct_label, learning_rate, num_classes):
     :param num_classes: Number of classes to classify
     :return: Tuple of (logits, train_op, cross_entropy_loss)
     """
-    # TODO: Implement function
-    return None, None, None
-tests.test_optimize(optimize)
+    logits = tf.reshape(nn_last_layer, (-1, num_classes))
+    correct_label = tf.reshape(correct_label, (-1, num_classes))
+    reg_losses = tf.get_collection(tf.GraphKeys.REGULARIZATION_LOSSES)
+    cross_entropy_loss = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits_v2(logits=logits, labels=correct_label))
+    cross_entropy_loss += tf.reduce_sum(reg_losses)
+    optimizer = tf.train.AdamOptimizer(learning_rate)
+    train_op = optimizer.minimize(loss=cross_entropy_loss)
+
+    tf.summary.scalar('cross_entropy_loss', cross_entropy_loss)
+
+    return logits, train_op, cross_entropy_loss
+#tests.test_optimize(optimize)
 
 
 def train_nn(sess, epochs, batch_size, get_batches_fn, train_op, cross_entropy_loss, input_image,
@@ -88,9 +123,38 @@ def train_nn(sess, epochs, batch_size, get_batches_fn, train_op, cross_entropy_l
     :param keep_prob: TF Placeholder for dropout keep probability
     :param learning_rate: TF Placeholder for learning rate
     """
-    # TODO: Implement function
-    pass
-tests.test_train_nn(train_nn)
+    merged = tf.summary.merge_all()
+    train_writer = tf.summary.FileWriter('./log',
+                                         sess.graph)
+    builder = tf.saved_model.builder.SavedModelBuilder('./trained/')
+
+    sess.run(tf.global_variables_initializer())
+
+    step = 50
+
+    for epoch in range(1, epochs+1):
+        cnt = 0
+
+        for image, label in get_batches_fn(batch_size):
+            summary, _, loss = sess.run([merged, train_op, cross_entropy_loss],
+                               feed_dict={
+                                   input_image: image,
+                                   correct_label: label,
+                                   learning_rate: 0.003,
+                                   keep_prob: 0.5
+                               })
+            if cnt % step == 0:
+                print("Epoch: " + str(epoch) + "/" + str(epochs) + " Loss:  {:.4f}".format(loss))
+                train_writer.add_summary(summary, cnt)
+
+            cnt += 1
+
+    builder.add_meta_graph_and_variables(sess, ["fcn_training"])
+    builder.add_meta_graph(["fcn_serving"], strip_default_attrs=True)
+    builder.save()
+
+
+# tests.test_train_nn(train_nn)
 
 
 def run():
@@ -116,12 +180,23 @@ def run():
         # OPTIONAL: Augment Images for better results
         #  https://datascience.stackexchange.com/questions/5224/how-to-prepare-augment-images-for-neural-network
 
-        # TODO: Build NN using load_vgg, layers, and optimize function
+        # Build NN using load_vgg, layers, and optimize function
+        image_input, keep_prob, layer3_out, layer4_out, layer7_out = load_vgg(sess, vgg_path)
+        fcn_8x = layers(layer3_out, layer4_out, layer7_out, num_classes)
 
-        # TODO: Train NN using the train_nn function
+        correct_label = tf.placeholder(tf.int32, [None, None, None, num_classes])
+        learning_rate = tf.placeholder(tf.float32)
+        logits, train_op, cross_entropy_loss = optimize(fcn_8x, correct_label, learning_rate, num_classes)
 
-        # TODO: Save inference data using helper.save_inference_samples
-        #  helper.save_inference_samples(runs_dir, data_dir, sess, image_shape, logits, keep_prob, input_image)
+        # Train NN using the train_nn function
+        epochs = 2
+        batch_size = 10
+        train_nn(sess, epochs, batch_size, get_batches_fn, train_op,
+                 cross_entropy_loss, image_input, correct_label, keep_prob,
+                 learning_rate)
+
+        # Save inference data using helper.save_inference_samples
+        helper.save_inference_samples(runs_dir, data_dir, sess, image_shape, logits, keep_prob, image_input)
 
         # OPTIONAL: Apply the trained model to a video
 

@@ -75,19 +75,26 @@ def layers(vgg_layer3_out, vgg_layer4_out, vgg_layer7_out, num_classes):
     pool3_out_scaled = tf.multiply(vgg_layer3_out, 0.0001, name='pool3_out_scaled')
     pool4_out_scaled = tf.multiply(vgg_layer4_out, 0.01, name='pool4_out_scaled')
 
-    conv_1x1 = tf.layers.conv2d(vgg_layer7_out, num_classes, 1, padding='same',
+    score_fr = tf.layers.conv2d(vgg_layer7_out, num_classes, 1, padding='same',
                                 kernel_regularizer=regularizer)
-    output = tf.layers.conv2d_transpose(conv_1x1, vgg_layer4_out.shape[-1], 4, strides=(2, 2), padding='same',
-                                         kernel_regularizer=regularizer)
-    output = tf.add(output, pool4_out_scaled)
 
-    output = tf.layers.conv2d_transpose(output, vgg_layer3_out.shape[-1], 4, strides=(2, 2), padding='same',
-                                        kernel_regularizer=regularizer)
+    upscore2 = tf.layers.conv2d_transpose(score_fr, num_classes, 4, strides=(2, 2), padding='same',
+                                          kernel_regularizer=regularizer)
+    score_pool4 = tf.layers.conv2d(pool4_out_scaled, num_classes, 1, padding='same',
+                                   kernel_regularizer=regularizer)
+    fuse_pool4 = tf.add(upscore2, score_pool4)
 
-    output = tf.add(output, pool3_out_scaled)
-    output = tf.layers.conv2d_transpose(output, num_classes, 16, strides=(8, 8), padding='same',
-                                        kernel_regularizer=regularizer)
-    return output
+
+    upscore_pool4 = tf.layers.conv2d_transpose(fuse_pool4, num_classes, 4, strides=(2, 2), padding='same',
+                                               kernel_regularizer=regularizer)
+    score_pool3 = tf.layers.conv2d(pool3_out_scaled, num_classes, 1, padding='same',
+                                   kernel_regularizer=regularizer)
+    fuse_pool3 = tf.add(upscore_pool4, score_pool3)
+
+
+    upscore8 = tf.layers.conv2d_transpose(fuse_pool3, num_classes, 16, strides=(8, 8), padding='same',
+                                          kernel_regularizer=regularizer)
+    return upscore8
 
 
 def validate_layers(vgg_path, num_classes):
