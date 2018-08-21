@@ -42,7 +42,7 @@ def load_vgg(sess, vgg_path):
     layer7_out = graph.get_tensor_by_name(vgg_layer7_out_tensor_name)
     
     return image_input, keep_prob, layer3_out, layer4_out, layer7_out
-tests.test_load_vgg(load_vgg, tf)
+#tests.test_load_vgg(load_vgg, tf)
 
 
 def layers(vgg_layer3_out, vgg_layer4_out, vgg_layer7_out, num_classes):
@@ -82,7 +82,7 @@ def layers(vgg_layer3_out, vgg_layer4_out, vgg_layer7_out, num_classes):
                                           kernel_regularizer=regularizer,
                                           kernel_initializer=initializer)
     return upscore8
-tests.test_layers(layers)
+#tests.test_layers(layers)
 
 
 def optimize(nn_last_layer, correct_label, learning_rate, num_classes):
@@ -190,7 +190,7 @@ def run():
 
         # Train NN using the train_nn function
         epochs = 20
-        batch_size = 10
+        batch_size = 5
         train_nn(sess, epochs, batch_size, get_batches_fn, train_op,
                  cross_entropy_loss, image_input, correct_label, keep_prob,
                  learning_rate)
