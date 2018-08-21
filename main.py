@@ -140,7 +140,7 @@ def train_nn(sess, epochs, batch_size, get_batches_fn, train_op, cross_entropy_l
                                feed_dict={
                                    input_image: image,
                                    correct_label: label,
-                                   learning_rate: 0.003,
+                                   learning_rate: 0.005,
                                    keep_prob: 0.5
                                })
             if cnt % step == 0:
@@ -184,13 +184,14 @@ def run():
         image_input, keep_prob, layer3_out, layer4_out, layer7_out = load_vgg(sess, vgg_path)
         fcn_8x = layers(layer3_out, layer4_out, layer7_out, num_classes)
 
-        correct_label = tf.placeholder(tf.int32, [None, None, None, num_classes])
+        correct_label = tf.placeholder(tf.float32, [None, image_shape[0], image_shape[1], num_classes])
         learning_rate = tf.placeholder(tf.float32)
+        keep_prob = tf.placeholder(tf.float32)
         logits, train_op, cross_entropy_loss = optimize(fcn_8x, correct_label, learning_rate, num_classes)
 
         # Train NN using the train_nn function
         epochs = 20
-        batch_size = 5
+        batch_size = 10
         train_nn(sess, epochs, batch_size, get_batches_fn, train_op,
                  cross_entropy_loss, image_input, correct_label, keep_prob,
                  learning_rate)
