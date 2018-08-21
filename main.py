@@ -162,7 +162,7 @@ def run():
     image_shape = (160, 576)
     data_dir = './data'
     runs_dir = './runs'
-    tests.test_for_kitti_dataset(data_dir)
+    # tests.test_for_kitti_dataset(data_dir)
 
     # Download pretrained vgg model
     helper.maybe_download_pretrained_vgg(data_dir)
@@ -186,12 +186,11 @@ def run():
 
         correct_label = tf.placeholder(tf.float32, [None, image_shape[0], image_shape[1], num_classes])
         learning_rate = tf.placeholder(tf.float32)
-        keep_prob = tf.placeholder(tf.float32)
         logits, train_op, cross_entropy_loss = optimize(fcn_8x, correct_label, learning_rate, num_classes)
 
         # Train NN using the train_nn function
-        epochs = 20
-        batch_size = 10
+        epochs = 2
+        batch_size = 5
         train_nn(sess, epochs, batch_size, get_batches_fn, train_op,
                  cross_entropy_loss, image_input, correct_label, keep_prob,
                  learning_rate)
