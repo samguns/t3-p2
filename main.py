@@ -97,8 +97,9 @@ def optimize(nn_last_layer, correct_label, learning_rate, num_classes):
     logits = tf.reshape(nn_last_layer, (-1, num_classes))
     correct_label = tf.reshape(correct_label, (-1, num_classes))
     reg_losses = tf.get_collection(tf.GraphKeys.REGULARIZATION_LOSSES)
-    cross_entropy_loss = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(logits=logits, labels=correct_label))
-    cross_entropy_loss += tf.reduce_sum(reg_losses)
+    cross_entropy_loss = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits_v2(logits=logits, labels=correct_label))
+    # cross_entropy_loss += tf.reduce_sum(reg_losses)
+    cross_entropy_loss = tf.add(cross_entropy_loss, sum(reg_losses))
     optimizer = tf.train.AdamOptimizer(learning_rate)
     train_op = optimizer.minimize(loss=cross_entropy_loss)
 
@@ -140,7 +141,7 @@ def train_nn(sess, epochs, batch_size, get_batches_fn, train_op, cross_entropy_l
                                feed_dict={
                                    input_image: image,
                                    correct_label: label,
-                                   learning_rate: 0.005,
+                                   learning_rate: 0.0001,
                                    keep_prob: 0.5
                                })
             if cnt % step == 0:
@@ -189,8 +190,8 @@ def run():
         logits, train_op, cross_entropy_loss = optimize(fcn_8x, correct_label, learning_rate, num_classes)
 
         # Train NN using the train_nn function
-        epochs = 15
-        batch_size = 10
+        epochs = 20
+        batch_size = 5
         train_nn(sess, epochs, batch_size, get_batches_fn, train_op,
                  cross_entropy_loss, image_input, correct_label, keep_prob,
                  learning_rate)
